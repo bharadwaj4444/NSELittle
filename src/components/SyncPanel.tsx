@@ -65,6 +65,14 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
         }
       } catch (err) {
         console.error("Failed to poll sync status:", err);
+        const isFileProtocol = window.location.protocol === 'file:';
+        setStatus(prev => ({
+          ...prev,
+          status: 'error',
+          message: isFileProtocol 
+            ? 'Running app from a local file path. Please open http://localhost:3000 in your browser to load via the Express server.'
+            : 'Unreachable Quant backend on port 3000. Ensure the Express server is running in your terminal (npm run dev).'
+        }));
       }
     }
 
