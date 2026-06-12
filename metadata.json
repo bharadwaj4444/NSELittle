@@ -1,0 +1,6 @@
+{
+  "name": "NSE Bhavcopy Breakout Analyzer",
+  "description": "Download historical NSE Bhavcopies, perform trend and volatility clustering, detect breakouts, and generate daily trading alerts with a full-stack trade visualization dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
