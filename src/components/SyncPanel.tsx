@@ -35,7 +35,11 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
   const [activeStocksCount, setActiveStocksCount] = useState(0);
   const [analyzedStocksCount, setAnalyzedStocksCount] = useState(0);
   const [months, setMonths] = useState<number>(3); // Default to 3 months for perfect balanced speed
-  const [syncMode, setSyncMode] = useState<'predefined' | 'custom'>('predefined');
+  const [syncMode, setSyncMode] = useState<'daily' | 'predefined' | 'custom'>('daily');
+  const [dailyDate, setDailyDate] = useState<string>(() => {
+    // Default to current date YYYY-MM-DD
+    return new Date().toISOString().split('T')[0];
+  });
   const [fromDate, setFromDate] = useState<string>(() => {
     // Default to 1 month ago
     const d = new Date();
@@ -101,7 +105,10 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
   async function triggerSync() {
     try {
       const body: any = {};
-      if (syncMode === 'predefined') {
+      if (syncMode === 'daily') {
+        body.fromDate = dailyDate;
+        body.toDate = dailyDate;
+      } else if (syncMode === 'predefined') {
         body.months = months;
       } else {
         body.fromDate = fromDate;
@@ -173,6 +180,12 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
               {/* Sync Mode Switcher */}
               <div className="flex items-center bg-slate-950 border border-slate-800 p-1 rounded-lg">
                 <button
+                  onClick={() => setSyncMode('daily')}
+                  className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded cursor-pointer ${syncMode === 'daily' ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-400/20' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  DAILY
+                </button>
+                <button
                   onClick={() => setSyncMode('predefined')}
                   className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded cursor-pointer ${syncMode === 'predefined' ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-400/20' : 'text-slate-400 hover:text-slate-200'}`}
                 >
@@ -186,8 +199,28 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
                 </button>
               </div>
 
-              {/* Predefined Months Dropdown */}
-              {syncMode === 'predefined' ? (
+              {/* Date pickers based on mode */}
+              {syncMode === 'daily' ? (
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 relative">
+                  <span className="text-[10px] font-mono font-bold text-slate-500 uppercase flex items-center gap-1">
+                    DATE:
+                    <span className="relative group inline-block cursor-help">
+                      <HelpCircle className="w-3 h-3 text-slate-500 hover:text-indigo-400" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[10px] font-sans font-normal leading-relaxed normal-case shadow-xl z-50 text-center">
+                        <strong>Daily copy</strong>: Fetches historical trading day bhavcopy file for the single selected calendar day.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="date"
+                    value={dailyDate}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setDailyDate(e.target.value)}
+                    disabled={status.status === 'syncing'}
+                    className="bg-transparent text-xs font-mono font-bold text-indigo-450 text-indigo-400 focus:outline-none cursor-pointer border-none"
+                  />
+                </div>
+              ) : syncMode === 'predefined' ? (
                 <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1 relative">
                   <span className="text-[10px] font-mono font-bold text-slate-500 uppercase px-2 flex items-center gap-1">
                     TIMEFRAME:

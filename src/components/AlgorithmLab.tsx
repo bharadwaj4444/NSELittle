@@ -833,16 +833,43 @@ export default function AlgorithmLab({ onSelectStock, refreshTrigger }: Algorith
                             const isBuy = evalItem.signal === 'BUY';
                             const isSell = evalItem.signal === 'SELL';
                             const isHold = evalItem.signal === 'HOLD';
+                            const strategyName = strategies.find(s => s.id === evalItem.id)?.name || 'Strategy';
                             
                             return (
-                              <td key={evalItem.id} className="p-4 text-center">
-                                <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                              <td key={evalItem.id} className="p-4 text-center relative group">
+                                <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold cursor-help ${
                                   isBuy ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                                     : isSell ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                                     : 'bg-slate-950 text-slate-500 border border-slate-850'
                                 }`}>
                                   {evalItem.signal}
                                 </span>
+
+                                {/* Rich elegant hover tooltip to show rationale & core metrics */}
+                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-72 p-3 bg-slate-950 border border-slate-800 rounded-lg text-left shadow-2xl z-55 pointer-events-none transition-all duration-150">
+                                  <div className="flex items-center justify-between border-b border-indigo-505/10 pb-1.5 mb-2">
+                                    <span className="text-[10px] font-black tracking-wide text-slate-200 truncate pr-2">
+                                      {strategyName}
+                                    </span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                                      isBuy ? 'bg-emerald-500/10 text-emerald-400' 
+                                        : isSell ? 'bg-rose-500/10 text-rose-400'
+                                        : 'bg-slate-900 text-slate-500'
+                                    }`}>
+                                      {evalItem.signal}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <div className="text-[10px] text-slate-400 leading-normal">
+                                      <strong className="text-slate-500 font-mono text-[9px] uppercase tracking-wider block mb-0.5">INDICATION Rationale:</strong>
+                                      {evalItem.reason}
+                                    </div>
+                                    <div className="text-[10px] text-slate-350 font-mono flex flex-wrap items-center gap-1.5 mt-1 pt-1.5 border-t border-slate-850/40">
+                                      <strong className="text-indigo-400 font-sans font-bold uppercase text-[9px]">LATEST METRICS:</strong>
+                                      <span className="bg-slate-905 bg-slate-900/60 px-1.5 py-0.5 rounded text-indigo-300">{evalItem.metrics}</span>
+                                    </div>
+                                  </div>
+                                </div>
                               </td>
                             );
                           })}
