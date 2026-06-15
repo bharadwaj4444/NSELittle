@@ -17,7 +17,8 @@ import {
   Github,
   Moon,
   Sun,
-  LayoutGrid
+  LayoutGrid,
+  Workflow
 } from 'lucide-react';
 import { StockAnalysis } from './types';
 import SyncPanel from './components/SyncPanel';
@@ -25,9 +26,10 @@ import ClusterGrid from './components/ClusterGrid';
 import AlertPanel from './components/AlertPanel';
 import TradeTracker from './components/TradeTracker';
 import StockChartModal from './components/StockChartModal';
+import AlgorithmLab from './components/AlgorithmLab';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'CLUSTERS' | 'ALERTS' | 'TRADES'>('CLUSTERS');
+  const [activeTab, setActiveTab] = useState<'CLUSTERS' | 'ALERTS' | 'TRADES' | 'ALGORITHMS'>('CLUSTERS');
   
   // Selected stock model representing target active modal chart
   const [selectedStock, setSelectedStock] = useState<StockAnalysis | null>(null);
@@ -184,6 +186,20 @@ export default function App() {
               <Briefcase className="w-4 h-4" />
               Portfolio Trade Tracker
             </button>
+
+            {/* Tab 4: Quantitative Algorithms */}
+            <button
+              id="tab-btn-algorithms"
+              onClick={() => setActiveTab('ALGORITHMS')}
+              className={`flex items-center gap-2 px-4.5 py-3 text-xs font-mono font-bold uppercase transition-[color,border] border-b-2 cursor-pointer ${
+                activeTab === 'ALGORITHMS' 
+                  ? 'border-indigo-505 border-indigo-500 text-indigo-400 font-black' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Workflow className="w-4 h-4" />
+              Quant Algorithms Lab
+            </button>
           </div>
 
           <div className="text-[10px] text-slate-500 font-mono uppercase font-bold shrink-0 text-right">
@@ -201,6 +217,9 @@ export default function App() {
           )}
           {activeTab === 'TRADES' && (
             <TradeTracker refreshTrigger={refreshTrigger} triggerRefresh={triggerRefresh} />
+          )}
+          {activeTab === 'ALGORITHMS' && (
+            <AlgorithmLab onSelectStock={setSelectedStock} refreshTrigger={refreshTrigger} />
           )}
         </div>
 
