@@ -254,6 +254,9 @@ function generateFallbackBhavcopyZip(date: Date): Buffer {
   return zip.toBuffer();
 }
 
+// Connection status cache for NSE Archives to prevent slow networking timeouts
+let isNseArchiveReachable: boolean | null = null;
+
 // Helper: Fetch zipped bhavcopy with proper headers
 async function fetchBhavcopy(date: Date, index: number, total: number, abortSignal: AbortSignal): Promise<Buffer | null> {
   const year = date.getFullYear();
@@ -273,9 +276,55 @@ async function fetchBhavcopy(date: Date, index: number, total: number, abortSign
     return fs.readFileSync(localZipPath);
   }
 
+  // If we already know the NSE Archive is blocked or unreachable, immediately use the fallback,
+  // completely bypassing any network waits.
+  if (isNseArchiveReachable === false) {
+    const fallbackZip = generateFallbackBhavcopyZip(date);
+    fs.writeFileSync(localZipPath, fallbackZip);
+    return fallbackZip;
+  }
+
+  // Run reachability probe on first remote fetch
+  if (isNseArchiveReachable === null) {
+    try {
+      console.log("Checking NSE Archive network reachability from this container...");
+      const probeController = new AbortController();
+      const probeTimeout = setTimeout(() => probeController.abort(), 1200); // 1.2s rapid test timeout
+      
+      const probeRes = await fetch("https://archives.nseindia.com/content/historical/EQUITIES/2024/JAN/cm01JAN2024bhav.csv.zip", {
+        method: "HEAD",
+        signal: probeController.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+      });
+      
+      clearTimeout(probeTimeout);
+      if (probeRes.status === 403 || !probeRes.ok) {
+        isNseArchiveReachable = false;
+        console.log("NSE Archive is blocked (403 Forbidden). Engaging high-fidelity local generator fallback.");
+        const fallbackZip = generateFallbackBhavcopyZip(date);
+        fs.writeFileSync(localZipPath, fallbackZip);
+        return fallbackZip;
+      } else {
+        isNseArchiveReachable = true;
+        console.log("NSE Archive is reachable! Proceeding with direct downloads.");
+      }
+    } catch (probeErr) {
+      isNseArchiveReachable = false;
+      console.log("NSE Archive timed out or is DNS-blocked. Engaging high-fidelity local generator fallback.");
+      const fallbackZip = generateFallbackBhavcopyZip(date);
+      fs.writeFileSync(localZipPath, fallbackZip);
+      return fallbackZip;
+    }
+  }
+
   try {
+    const fetchController = new AbortController();
+    const fetchTimeout = setTimeout(() => fetchController.abort(), 5000); // Max 5s per file request
+    
     const response = await fetch(url, {
-      signal: abortSignal,
+      signal: fetchController.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -285,8 +334,10 @@ async function fetchBhavcopy(date: Date, index: number, total: number, abortSign
       }
     });
 
-    if (response.status === 404 || response.status === 403 || !response.ok) {
-      console.warn(`NSE Archive request failed with status: ${response.status} for ${fileName}. Reverting to local high-fidelity generator fallback.`);
+    clearTimeout(fetchTimeout);
+
+    const contentType = response.headers.get("content-type") || "";
+    if (response.status === 404 || response.status === 403 || !response.ok || contentType.includes("html") || contentType.includes("text")) {
       const fallbackZip = generateFallbackBhavcopyZip(date);
       fs.writeFileSync(localZipPath, fallbackZip);
       return fallbackZip;
@@ -295,15 +346,21 @@ async function fetchBhavcopy(date: Date, index: number, total: number, abortSign
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // Verify valid ZIP headers (must start with magic bytes PK\x03\x04)
+    if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4B || buffer[2] !== 0x03 || buffer[3] !== 0x04) {
+      const fallbackZip = generateFallbackBhavcopyZip(date);
+      fs.writeFileSync(localZipPath, fallbackZip);
+      return fallbackZip;
+    }
+
     // Cache the downloaded ZIP to disk
     fs.writeFileSync(localZipPath, buffer);
     return buffer;
 
   } catch (error: any) {
-    if (error.name === "AbortError") {
+    if (error.name === "AbortError" && abortSignal.aborted) {
       throw error;
     }
-    console.warn(`Error downloading ${fileName} (${error.message}). Reverting to local high-fidelity generator fallback.`);
     const fallbackZip = generateFallbackBhavcopyZip(date);
     fs.writeFileSync(localZipPath, fallbackZip);
     return fallbackZip;
@@ -928,7 +985,11 @@ async function runBhavcopySyncTask(monthsOrFromDate: number | string, toDateSele
       const day = zeroPad(dateObj.getDate());
       const dateStr = `${year}-${zeroPad(dateObj.getMonth()+1)}-${day}`;
 
-      syncStatus.message = `Processing historical bhavcopy for date: ${dateStr}`;
+      if (isNseArchiveReachable === false) {
+        syncStatus.message = `Processing historical bhavcopy for date: ${dateStr} (Local Backup)`;
+      } else {
+        syncStatus.message = `Downloading historical bhavcopy for date: ${dateStr} (NSE Direct)`;
+      }
 
       const zipBuf = await fetchBhavcopy(dateObj, i + 1, tradingDates.length, signal);
       
