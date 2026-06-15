@@ -14,7 +14,8 @@ import {
   Sliders, 
   AlertTriangle,
   Play,
-  Maximize2
+  Maximize2,
+  HelpCircle
 } from 'lucide-react';
 import { TradingAlert, StockAnalysis } from '../types.js';
 
@@ -213,19 +214,37 @@ export default function AlertPanel({ onSelectSymbol, refreshTrigger }: AlertPane
 
                 {/* Micro metrics details */}
                 <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-850/80 font-mono text-[9px]">
-                  <div className="text-center p-1 bg-slate-950/20 rounded">
-                    <span className="block text-slate-500">RSI</span>
-                    <span className="text-slate-300 font-semibold">{al.indicators.rsi || '—'}</span>
+                  <div className="text-center p-1 bg-slate-950/20 rounded relative group/rsi cursor-help">
+                    <span className="block text-slate-500 flex items-center justify-center gap-0.5">
+                      RSI
+                      <HelpCircle className="w-2 h-2 text-slate-600" />
+                    </span>
+                    <span className="text-slate-300 font-semibold">{al.indicators.rsi ? al.indicators.rsi.toFixed(1) : '—'}</span>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/rsi:block w-40 p-2 bg-slate-950 border border-slate-830 border-slate-800 text-slate-305 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+                      <strong>Relative Strength Index</strong>: Momentum indicator. Overbought (≥70) or Oversold (≤30).
+                    </span>
                   </div>
-                  <div className="text-center p-1 bg-slate-950/20 rounded">
-                    <span className="block text-slate-500">BB WIDTH</span>
+                  <div className="text-center p-1 bg-slate-950/20 rounded relative group/bb cursor-help">
+                    <span className="block text-slate-500 flex items-center justify-center gap-0.5">
+                      BB WIDTH
+                      <HelpCircle className="w-2 h-2 text-slate-600" />
+                    </span>
                     <span className="text-slate-300 font-semibold">
                       {al.indicators.bbWidth ? `${(al.indicators.bbWidth * 100).toFixed(1)}%` : '—'}
                     </span>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/bb:block w-40 p-2 bg-slate-950 border border-slate-830 border-slate-800 text-slate-305 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+                      <strong>Bollinger Bandwidth</strong>: Channel width. Squeezes &lt; 8% signal incoming explosive moves.
+                    </span>
                   </div>
-                  <div className="text-center p-1 bg-slate-950/20 rounded">
-                    <span className="block text-slate-500">VOL RATIO</span>
+                  <div className="text-center p-1 bg-slate-950/20 rounded relative group/vol cursor-help">
+                    <span className="block text-slate-500 flex items-center justify-center gap-0.5">
+                      VOL RATIO
+                      <HelpCircle className="w-2 h-2 text-slate-600" />
+                    </span>
                     <span className="text-slate-300 font-semibold">{al.indicators.volumeRatio.toFixed(1)}x</span>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/vol:block w-40 p-2 bg-slate-950 border border-slate-830 border-slate-800 text-slate-305 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+                      <strong>Volume Ratio</strong>: Relative daily volume multiplier vs 20-day mean. Higher means more breakout conviction.
+                    </span>
                   </div>
                 </div>
 

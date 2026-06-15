@@ -20,7 +20,8 @@ import {
   Grid,
   Percent,
   CheckCircle2,
-  XCircle
+  XCircle,
+  HelpCircle
 } from 'lucide-react';
 import { Trade } from '../types.js';
 
@@ -159,9 +160,12 @@ export default function TradeTracker({ refreshTrigger, triggerRefresh }: TradeTr
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Metric 1: Open P&L */}
-        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs">
+        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs relative group">
           <div className="space-y-1">
-            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">LIVE OPEN P&L</span>
+            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase cursor-help flex items-center gap-1">
+              LIVE OPEN P&L
+              <HelpCircle className="w-3 h-3 text-indigo-400" />
+            </span>
             <div className={`text-xl font-bold font-mono ${totalOpenPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               ₹{totalOpenPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
@@ -170,12 +174,18 @@ export default function TradeTracker({ refreshTrigger, triggerRefresh }: TradeTr
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${totalOpenPnl >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
             <Briefcase className="w-5 h-5" />
           </div>
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+            <strong>Live Open P&L</strong>: Sum of unrealized paper gains/losses for all active positions, computed using latest synced NSE bhavcopy prices.
+          </span>
         </div>
 
         {/* Metric 2: Realized profits */}
-        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs">
+        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs relative group">
           <div className="space-y-1">
-            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">ARCHIVED PROFITS</span>
+            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase cursor-help flex items-center gap-1">
+              ARCHIVED PROFITS
+              <HelpCircle className="w-3 h-3 text-indigo-400" />
+            </span>
             <div className={`text-xl font-bold font-mono ${totalRealizedPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               ₹{totalRealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
@@ -184,26 +194,38 @@ export default function TradeTracker({ refreshTrigger, triggerRefresh }: TradeTr
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${totalRealizedPnl >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
             <TrendingUp className="w-5 h-5" />
           </div>
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+            <strong>Archived Profits</strong>: Total realized returns calculated from completed setups that reached target or triggered stop-loss.
+          </span>
         </div>
 
         {/* Metric 3: Win Rate */}
-        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs">
+        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs relative group">
           <div className="space-y-1">
-            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">SWING WIN RATE</span>
+            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase cursor-help flex items-center gap-1">
+              SWING WIN RATE
+              <HelpCircle className="w-3 h-3 text-indigo-400" />
+            </span>
             <div className="text-xl font-bold font-mono text-slate-100">
               {winRate.toFixed(1)}%
             </div>
-            <p className="text-[10px] text-slate-400">{profitableClosedCount => profitTradeCount} of {closedTrades.length} setups closed profitable</p>
+            <p className="text-[10px] text-slate-400">{profitTradeCount} of {closedTrades.length} setups closed profitable</p>
           </div>
           <div className="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
             <Percent className="w-5 h-5" />
           </div>
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+            <strong>Swing Win Rate</strong>: Percentage of closed positions terminated above entry price versus below. Aim for &gt; 50% with positive risk-reward.
+          </span>
         </div>
 
         {/* Metric 4: Ratio allocations */}
-        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs">
+        <div className="bg-slate-900 border border-slate-800 p-4.5 rounded-xl flex items-center justify-between shadow-xs relative group">
           <div className="space-y-1">
-            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase">RUNNING SETUPS</span>
+            <span className="text-[10px] font-mono font-bold tracking-wider text-slate-500 uppercase cursor-help flex items-center gap-1">
+              RUNNING SETUPS
+              <HelpCircle className="w-3 h-3 text-indigo-400" />
+            </span>
             <div className="text-xl font-bold font-mono text-slate-100">
               {activeTrades.length} Open
             </div>
@@ -212,6 +234,9 @@ export default function TradeTracker({ refreshTrigger, triggerRefresh }: TradeTr
           <div className="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
             <Target className="w-5 h-5" />
           </div>
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+            <strong>Running Setups</strong>: Number of currently active positions outstanding. Good risk management suggests limiting to 5-7 active listings simultaneously.
+          </span>
         </div>
 
       </div>

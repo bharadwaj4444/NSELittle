@@ -108,12 +108,24 @@ function saveCacheToFilesystem() {
 // Initial configuration load
 loadCacheFromFilesystem();
 
-// Helper: Generate trading days over the last N months excluding weekends
-function generateTradingDays(months: number): Date[] {
+// Helper: Generate trading days over the last N months or between specific dates, excluding weekends
+function generateTradingDays(monthsOrFromDate: number | string, toDateStr?: string): Date[] {
   const dates: Date[] = [];
-  const end = new Date(); // Today
-  const start = new Date();
-  start.setMonth(start.getMonth() - months);
+  let start: Date;
+  let end: Date;
+
+  if (typeof monthsOrFromDate === "number") {
+    start = new Date();
+    start.setMonth(start.getMonth() - monthsOrFromDate);
+    end = new Date();
+  } else {
+    start = new Date(monthsOrFromDate);
+    end = toDateStr ? new Date(toDateStr) : new Date();
+  }
+
+  // Normalize dates to prevent timezone hour mismatch exclusions
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
 
   let current = new Date(start);
   while (current <= end) {
@@ -887,7 +899,7 @@ function generateTradingAlerts(analysisList: StockAnalysis[]): TradingAlert[] {
 // Global controllers for the background sync process
 let activeAbortController: AbortController | null = null;
 
-async function runBhavcopySyncTask(monthsSelection: number) {
+async function runBhavcopySyncTask(monthsOrFromDate: number | string, toDateSelection?: string) {
   if (syncStatus.status === "syncing") return;
 
   activeAbortController = new AbortController();
@@ -900,7 +912,7 @@ async function runBhavcopySyncTask(monthsSelection: number) {
   syncStatus.message = "Initializing NSE historical calendar analyzer...";
 
   try {
-    const tradingDates = generateTradingDays(monthsSelection);
+    const tradingDates = generateTradingDays(monthsOrFromDate, toDateSelection);
     syncStatus.total = tradingDates.length;
     console.log(`Prepared list of calendar weekdays to fetch: ${tradingDates.length} days.`);
 
@@ -1038,13 +1050,22 @@ app.get("/api/sync/status", (req, res) => {
 
 // API: Start background task processing for NSE download
 app.post("/api/sync/start", (req, res) => {
-  const months = parseInt(req.body.months || "3"); // Default to last 3 months for perfect balanced speed
+  const { months, fromDate, toDate } = req.body;
   if (syncStatus.status === "syncing") {
     return res.status(400).json({ error: "Sync operation is already in progress, please wait." });
   }
+
+  let targetFrom: number | string = parseInt(months || "3");
+  let targetTo: string | undefined = undefined;
+
+  if (fromDate) {
+    targetFrom = fromDate;
+    // toDate defaults to current day formatted as YYYY-MM-DD
+    targetTo = toDate || new Date().toISOString().split("T")[0];
+  }
   
   // Launch asynchronous task background
-  runBhavcopySyncTask(months);
+  runBhavcopySyncTask(targetFrom, targetTo);
   res.json({ message: "Bhavcopy download task launched successfully." });
 });
 

@@ -14,7 +14,8 @@ import {
   Zap,
   Tag,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  HelpCircle
 } from 'lucide-react';
 import { StockCluster, StockAnalysis } from '../types.js';
 
@@ -202,12 +203,60 @@ export default function ClusterGrid({ onSelectStock, refreshTrigger }: ClusterGr
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-950/20 text-slate-400 font-mono text-[10px] tracking-wider uppercase border-b border-slate-850">
-                  <th className="p-3.5 pl-5">Ticker Symbol</th>
-                  <th className="p-3.5">Price (LTP)</th>
-                  <th className="p-3.5">Daily Change %</th>
-                  <th className="p-3.5">RSI (14)</th>
-                  <th className="p-3.5">BB Bandwidth</th>
-                  <th className="p-3.5 text-center">Breakout Check</th>
+                  <th className="p-3.5 pl-5 relative group">
+                    <span className="cursor-help flex items-center gap-1">
+                      Ticker Symbol
+                      <HelpCircle className="w-3 h-3 text-slate-500" />
+                    </span>
+                    <span className="absolute left-5 top-full mt-1.5 hidden group-hover:block w-48 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal normal-case leading-relaxed shadow-xl z-55 text-left">
+                      <strong>Ticker Symbol</strong>: Unique code identifying the listed stock on the NSE (e.g., Reliance, TCS).
+                    </span>
+                  </th>
+                  <th className="p-3.5 relative group">
+                    <span className="cursor-help flex items-center gap-1">
+                      Price (LTP)
+                      <HelpCircle className="w-3 h-3 text-slate-500" />
+                    </span>
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 hidden group-hover:block w-48 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal normal-case leading-relaxed shadow-xl z-55 text-left">
+                      <strong>Last Traded Price</strong>: The final transaction pricing recorded on the exchange. We monitor this relative to historical supports.
+                    </span>
+                  </th>
+                  <th className="p-3.5 relative group">
+                    <span className="cursor-help flex items-center gap-1">
+                      Daily Change %
+                      <HelpCircle className="w-3 h-3 text-slate-500" />
+                    </span>
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 hidden group-hover:block w-48 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal normal-case leading-relaxed shadow-xl z-55 text-left">
+                      <strong>Daily Change %</strong>: Percentage return versus previous day's close. Indicates instant trading velocity and relative trend strength.
+                    </span>
+                  </th>
+                  <th className="p-3.5 relative group">
+                    <span className="cursor-help flex items-center gap-1 text-indigo-400 font-bold">
+                      RSI (14)
+                      <HelpCircle className="w-3 h-3 text-indigo-400" />
+                    </span>
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 hidden group-hover:block w-52 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal normal-case leading-relaxed shadow-xl z-55 text-left">
+                      <strong>Relative Strength Index</strong>: Momentum oscillator. We look for oversold conditions (≤30) for buy discounts, or overbought (≥70) to identify peak seller risk.
+                    </span>
+                  </th>
+                  <th className="p-3.5 relative group">
+                    <span className="cursor-help flex items-center gap-1">
+                      BB Bandwidth
+                      <HelpCircle className="w-3 h-3 text-slate-500" />
+                    </span>
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 hidden group-hover:block w-52 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal normal-case leading-relaxed shadow-xl z-55 text-left">
+                      <strong>Bollinger Bandwidth</strong>: Measures absolute volatility contraction channel. Values below 8% indicate tight market squeeze (imminent explosive breakouts).
+                    </span>
+                  </th>
+                  <th className="p-3.5 text-center relative group">
+                    <span className="cursor-help inline-flex items-center gap-1 justify-center w-full">
+                      Breakout Check
+                      <HelpCircle className="w-3 h-3 text-slate-500" />
+                    </span>
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 hidden group-hover:block w-52 p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal normal-case leading-relaxed shadow-xl z-55 text-left">
+                      <strong>Breakout score (1-10)</strong>: Quant model aggregating volatility squeeze, high volume multipliers, and price resistance tests to flag explosive trade triggers.
+                    </span>
+                  </th>
                   <th className="p-3.5 pr-5"></th>
                 </tr>
               </thead>

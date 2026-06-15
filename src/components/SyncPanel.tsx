@@ -13,7 +13,8 @@ import {
   AlertCircle, 
   CheckCircle2, 
   ShieldAlert,
-  Loader2 
+  Loader2,
+  HelpCircle
 } from 'lucide-react';
 import { SyncStatus } from '../types.js';
 
@@ -34,6 +35,17 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
   const [activeStocksCount, setActiveStocksCount] = useState(0);
   const [analyzedStocksCount, setAnalyzedStocksCount] = useState(0);
   const [months, setMonths] = useState<number>(3); // Default to 3 months for perfect balanced speed
+  const [syncMode, setSyncMode] = useState<'predefined' | 'custom'>('predefined');
+  const [fromDate, setFromDate] = useState<string>(() => {
+    // Default to 1 month ago
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState<string>(() => {
+    // Today's current day
+    return new Date().toISOString().split('T')[0];
+  });
   const [polling, setPolling] = useState(true);
 
   // Poll sync status
@@ -88,10 +100,18 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
 
   async function triggerSync() {
     try {
+      const body: any = {};
+      if (syncMode === 'predefined') {
+        body.months = months;
+      } else {
+        body.fromDate = fromDate;
+        body.toDate = toDate;
+      }
+
       const res = await fetch('/api/sync/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ months })
+        body: JSON.stringify(body)
       });
       if (!res.ok) {
         const errData = await res.json();
@@ -150,22 +170,90 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
             </button>
           ) : (
             <>
-              {/* Timeline dropdown selection */}
-              <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1">
-                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase px-2">TIMEFRAME:</span>
-                <select
-                  id="months-select"
-                  value={months}
-                  onChange={(e) => setMonths(parseInt(e.target.value))}
-                  disabled={status.status === 'syncing'}
-                  className="bg-transparent text-xs font-mono font-bold text-indigo-400 focus:outline-none pr-2 cursor-pointer"
+              {/* Sync Mode Switcher */}
+              <div className="flex items-center bg-slate-950 border border-slate-800 p-1 rounded-lg">
+                <button
+                  onClick={() => setSyncMode('predefined')}
+                  className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded cursor-pointer ${syncMode === 'predefined' ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-400/20' : 'text-slate-400 hover:text-slate-200'}`}
                 >
-                  <option value={1} className="bg-slate-900">1 Month (Fastest Proof)</option>
-                  <option value={3} className="bg-slate-900">3 Months (Recommended)</option>
-                  <option value={6} className="bg-slate-900">6 Months (Comprehensive)</option>
-                  <option value={12} className="bg-slate-900">1 Year (Full Bhavcopys)</option>
-                </select>
+                  MONTHS
+                </button>
+                <button
+                  onClick={() => setSyncMode('custom')}
+                  className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded cursor-pointer ${syncMode === 'custom' ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-400/20' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  RANGE
+                </button>
               </div>
+
+              {/* Predefined Months Dropdown */}
+              {syncMode === 'predefined' ? (
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1 relative">
+                  <span className="text-[10px] font-mono font-bold text-slate-500 uppercase px-2 flex items-center gap-1">
+                    TIMEFRAME:
+                    <span className="relative group inline-block cursor-help">
+                      <HelpCircle className="w-3 h-3 text-slate-500 hover:text-indigo-400" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[10px] font-sans font-normal leading-relaxed normal-case shadow-xl z-50 text-center">
+                        <strong>Predefined range</strong>: Fetches historical trading day bhavcopys over the chosen number of months. Greater ranges produce wider timeseries lists.
+                      </span>
+                    </span>
+                  </span>
+                  <select
+                    id="months-select"
+                    value={months}
+                    onChange={(e) => setMonths(parseInt(e.target.value))}
+                    disabled={status.status === 'syncing'}
+                    className="bg-transparent text-xs font-mono font-bold text-indigo-305 text-indigo-450 focus:outline-none pr-2 cursor-pointer"
+                  >
+                    <option value={1} className="bg-slate-900">1 Month (Fastest Proof)</option>
+                    <option value={3} className="bg-slate-900">3 Months (Recommended)</option>
+                    <option value={6} className="bg-slate-900">6 Months (Comprehensive)</option>
+                    <option value={12} className="bg-slate-900">1 Year (Full Bhavcopys)</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* From Date custom selector */}
+                  <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 relative">
+                    <span className="text-[10px] font-mono font-bold text-slate-500 uppercase flex items-center gap-1">
+                      FROM:
+                      <span className="relative group inline-block cursor-help">
+                        <HelpCircle className="w-3 h-3 text-slate-500 hover:text-indigo-400" />
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[10px] font-sans font-normal leading-relaxed normal-case shadow-xl z-50 text-center">
+                          <strong>From Date</strong>: Starts downloading bhavcopys starting from this custom day. Only trades/weekdays are fetched.
+                        </span>
+                      </span>
+                    </span>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      max={new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      disabled={status.status === 'syncing'}
+                      className="bg-transparent text-xs font-mono font-bold text-indigo-400 focus:outline-none cursor-pointer border-none"
+                    />
+                  </div>
+
+                  {/* To Date current day selector with help text */}
+                  <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 relative">
+                    <span className="text-[10px] font-mono font-bold text-slate-500 uppercase flex items-center gap-1">
+                      TO (TODAY):
+                      <span className="relative group inline-block cursor-help">
+                        <HelpCircle className="w-3 h-3 text-slate-500 hover:text-indigo-400" />
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-52 p-2 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[10px] font-sans font-normal leading-relaxed normal-case shadow-xl z-50 text-center">
+                          <strong>To Date</strong>: Set to the current calendar day as required. Fetches everything up to the latest closing exchange copy.
+                        </span>
+                      </span>
+                    </span>
+                    <input
+                      type="date"
+                      value={toDate}
+                      disabled
+                      className="bg-transparent text-xs font-mono font-bold text-slate-500 focus:outline-none cursor-not-allowed border-none"
+                    />
+                  </div>
+                </div>
+              )}
 
               <button
                 id="start-sync-btn"
@@ -174,7 +262,7 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
                 disabled={status.status === 'syncing'}
               >
                 <Play className="w-4 h-4 fill-white" />
-                SYNC LATEST NSE COPIES
+                SYNC COPIES
               </button>
             </>
           )}
@@ -231,20 +319,38 @@ export default function SyncPanel({ onSyncComplete }: SyncPanelProps) {
           </p>
 
           <div className="grid grid-cols-2 gap-2 my-2 text-center">
-            <div className="p-1.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
-              <span className="block text-[10px] font-mono text-slate-500 uppercase">ACTIVE SYMBOLS</span>
+            <div className="p-1.5 bg-slate-900/60 rounded-lg border border-slate-800/80 relative group">
+              <span className="block text-[10px] font-mono text-slate-500 uppercase cursor-help flex items-center justify-center gap-0.5">
+                ACTIVE
+                <HelpCircle className="w-2.5 h-2.5 text-slate-600" />
+              </span>
               <span className="text-lg font-bold font-mono text-slate-200">{activeStocksCount}</span>
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-40 p-2 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+                Number of unique priority securities indexed.
+              </span>
             </div>
-            <div className="p-1.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
-              <span className="block text-[10px] font-mono text-slate-500 uppercase">CALC TIMESERIES</span>
+            <div className="p-1.5 bg-slate-900/60 rounded-lg border border-slate-800/80 relative group">
+              <span className="block text-[10px] font-mono text-slate-500 uppercase cursor-help flex items-center justify-center gap-0.5">
+                ANALYZED
+                <HelpCircle className="w-2.5 h-2.5 text-slate-600" />
+              </span>
               <span className="text-lg font-bold font-mono text-slate-200">{analyzedStocksCount}</span>
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-40 p-2 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+                Securities with sufficient history (20+ days) parsed into indicator matrices.
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 justify-center">
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 justify-center relative group">
             <Calendar className="w-3 h-3 text-indigo-400" />
-            <span>LAST SYNC DATE:</span>
+            <span className="cursor-help flex items-center gap-0.5">
+              LAST SYNC DATE:
+              <HelpCircle className="w-2.5 h-2.5 text-slate-600" />
+            </span>
             <span className="font-bold text-slate-200">{status.lastSyncedDate || 'NEVER'}</span>
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block w-44 p-2 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[9px] font-sans font-normal leading-normal shadow-xl z-55 text-center">
+              The date of the most recent exchange bhavcopy row present in your dataset.
+            </span>
           </div>
         </div>
 
