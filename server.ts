@@ -254,8 +254,52 @@ function generateFallbackBhavcopyZip(date: Date): Buffer {
   return zip.toBuffer();
 }
 
-// Connection status cache for NSE Archives to prevent slow networking timeouts
-let isNseArchiveReachable: boolean | null = null;
+let cachedCookies: string | null = null;
+let cachedCookiesExpiry = 0;
+
+async function getNseCookies(): Promise<string> {
+  if (cachedCookies && Date.now() < cachedCookiesExpiry) {
+    return cachedCookies;
+  }
+
+  console.log("Fetching new session cookies from nseindia.com...");
+  const response = await fetch("https://www.nseindia.com", {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Connection": "keep-alive"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to establish session: ${response.status} ${response.statusText}`);
+  }
+
+  let cookieArray: string[] = [];
+  if (typeof response.headers.getSetCookie === 'function') {
+    cookieArray = response.headers.getSetCookie();
+  } else {
+    const rawCookies = response.headers.get('set-cookie');
+    if (rawCookies) {
+      cookieArray = rawCookies.split(/,\s*/);
+    }
+  }
+
+  if (cookieArray.length === 0) {
+    console.warn("No Set-Cookie headers returned from www.nseindia.com");
+  }
+
+  const cookies = cookieArray
+    .map(c => c.split(';')[0].trim())
+    .filter(Boolean)
+    .join('; ');
+
+  cachedCookies = cookies;
+  cachedCookiesExpiry = Date.now() + 10 * 60 * 1000; // Cache for 10 minutes
+  return cookies;
+}
 
 // Helper: Fetch zipped bhavcopy with proper headers
 async function fetchBhavcopy(date: Date, index: number, total: number, abortSignal: AbortSignal): Promise<Buffer | null> {
@@ -265,7 +309,18 @@ async function fetchBhavcopy(date: Date, index: number, total: number, abortSign
   
   // Format: cm11JUN2026bhav.csv.zip
   const fileName = `cm${day}${month}${year}bhav.csv.zip`;
-  const url = `https://archives.nseindia.com/content/historical/EQUITIES/${year}/${month}/${fileName}`;
+  
+  const monthNum = zeroPad(date.getMonth() + 1);
+  const dateStr = `${day}${monthNum}${year}`;
+  
+  const archivesParam = JSON.stringify([{
+    name: "Full Bhavcopy and Security Deliverable data",
+    type: "daily-reports",
+    category: "capital-market",
+    section: "equities"
+  }]);
+  const url = `https://www.nseindia.com/api/reports?archives=${encodeURIComponent(archivesParam)}&date=${dateStr}&type=equities&mode=single`;
+  
   const localZipPath = path.join(DOWNLOADS_DIR, fileName);
 
   syncStatus.currentFile = fileName;
@@ -273,98 +328,90 @@ async function fetchBhavcopy(date: Date, index: number, total: number, abortSign
 
   // If already downloaded locally, read and return
   if (fs.existsSync(localZipPath)) {
-    return fs.readFileSync(localZipPath);
-  }
-
-  // If we already know the NSE Archive is blocked or unreachable, immediately use the fallback,
-  // completely bypassing any network waits.
-  if (isNseArchiveReachable === false) {
-    const fallbackZip = generateFallbackBhavcopyZip(date);
-    fs.writeFileSync(localZipPath, fallbackZip);
-    return fallbackZip;
-  }
-
-  // Run reachability probe on first remote fetch
-  if (isNseArchiveReachable === null) {
     try {
-      console.log("Checking NSE Archive network reachability from this container...");
-      const probeController = new AbortController();
-      const probeTimeout = setTimeout(() => probeController.abort(), 1200); // 1.2s rapid test timeout
+      const buffer = fs.readFileSync(localZipPath);
+      // Verify valid ZIP headers (must start with PK\x03\x04)
+      if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04) {
+        return buffer;
+      }
+    } catch (err) {
+      console.warn(`Error reading local zip ${fileName}:`, err);
+    }
+  }
+
+  let attempt = 1;
+  const maxAttempts = 2;
+
+  while (attempt <= maxAttempts) {
+    try {
+      const cookies = await getNseCookies();
+      const fetchController = new AbortController();
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 8000); // 8 seconds per file fetch
       
-      const probeRes = await fetch("https://archives.nseindia.com/content/historical/EQUITIES/2024/JAN/cm01JAN2024bhav.csv.zip", {
-        method: "HEAD",
-        signal: probeController.signal,
+      const response = await fetch(url, {
+        signal: fetchController.signal,
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+          "Accept": "*/*",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Accept-Encoding": "gzip, deflate, br",
+          "Referer": "https://www.nseindia.com/all-reports",
+          "Cookie": cookies,
+          "Connection": "keep-alive"
         }
       });
-      
-      clearTimeout(probeTimeout);
-      if (probeRes.status === 403 || !probeRes.ok) {
-        isNseArchiveReachable = false;
-        console.log("NSE Archive is blocked (403 Forbidden). Engaging high-fidelity local generator fallback.");
-        const fallbackZip = generateFallbackBhavcopyZip(date);
-        fs.writeFileSync(localZipPath, fallbackZip);
-        return fallbackZip;
-      } else {
-        isNseArchiveReachable = true;
-        console.log("NSE Archive is reachable! Proceeding with direct downloads.");
+
+      clearTimeout(fetchTimeout);
+
+      const contentType = response.headers.get("content-type") || "";
+
+      // If we get a 401 or 403, and this was our first attempt, our cached cookies might be stale/expired.
+      // Force cookie refresh on next try.
+      if ((response.status === 401 || response.status === 403) && attempt < maxAttempts) {
+        console.warn(`Attempt ${attempt} failed with status ${response.status}. Stale cookies likely. Clearing cookies cache and retrying...`);
+        cachedCookies = null;
+        cachedCookiesExpiry = 0;
+        attempt++;
+        continue;
       }
-    } catch (probeErr) {
-      isNseArchiveReachable = false;
-      console.log("NSE Archive timed out or is DNS-blocked. Engaging high-fidelity local generator fallback.");
-      const fallbackZip = generateFallbackBhavcopyZip(date);
-      fs.writeFileSync(localZipPath, fallbackZip);
-      return fallbackZip;
+
+      if (response.status === 404 || response.status === 403 || !response.ok || contentType.includes("html") || contentType.includes("text")) {
+        console.warn(`NSE Report request failed with status: ${response.status}, content-type: ${contentType} for date ${dateStr}.`);
+        return null;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Verify valid ZIP headers (must start with magic bytes PK\x03\x04)
+      if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4B || buffer[2] !== 0x03 || buffer[3] !== 0x04) {
+        console.warn(`Downloaded file for ${fileName} is not a valid ZIP archive.`);
+        return null;
+      }
+
+      // Cache the downloaded ZIP to disk
+      fs.writeFileSync(localZipPath, buffer);
+      return buffer;
+
+    } catch (error: any) {
+      if (error.name === "AbortError" && abortSignal.aborted) {
+        throw error;
+      }
+
+      if (attempt < maxAttempts) {
+        console.warn(`Attempt ${attempt} error: ${error.message}. Retrying with fresh cookies...`);
+        cachedCookies = null;
+        cachedCookiesExpiry = 0;
+        attempt++;
+        continue;
+      }
+
+      console.warn(`Error downloading ${fileName} (${error.message}). No simulated fallback allowed.`);
+      return null;
     }
   }
 
-  try {
-    const fetchController = new AbortController();
-    const fetchTimeout = setTimeout(() => fetchController.abort(), 5000); // Max 5s per file request
-    
-    const response = await fetch(url, {
-      signal: fetchController.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://www.nseindia.com/",
-        "Connection": "keep-alive"
-      }
-    });
-
-    clearTimeout(fetchTimeout);
-
-    const contentType = response.headers.get("content-type") || "";
-    if (response.status === 404 || response.status === 403 || !response.ok || contentType.includes("html") || contentType.includes("text")) {
-      const fallbackZip = generateFallbackBhavcopyZip(date);
-      fs.writeFileSync(localZipPath, fallbackZip);
-      return fallbackZip;
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Verify valid ZIP headers (must start with magic bytes PK\x03\x04)
-    if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4B || buffer[2] !== 0x03 || buffer[3] !== 0x04) {
-      const fallbackZip = generateFallbackBhavcopyZip(date);
-      fs.writeFileSync(localZipPath, fallbackZip);
-      return fallbackZip;
-    }
-
-    // Cache the downloaded ZIP to disk
-    fs.writeFileSync(localZipPath, buffer);
-    return buffer;
-
-  } catch (error: any) {
-    if (error.name === "AbortError" && abortSignal.aborted) {
-      throw error;
-    }
-    const fallbackZip = generateFallbackBhavcopyZip(date);
-    fs.writeFileSync(localZipPath, fallbackZip);
-    return fallbackZip;
-  }
+  return null;
 }
 
 // Parse extracted CSV content from ZIP
@@ -985,11 +1032,7 @@ async function runBhavcopySyncTask(monthsOrFromDate: number | string, toDateSele
       const day = zeroPad(dateObj.getDate());
       const dateStr = `${year}-${zeroPad(dateObj.getMonth()+1)}-${day}`;
 
-      if (isNseArchiveReachable === false) {
-        syncStatus.message = `Processing historical bhavcopy for date: ${dateStr} (Local Backup)`;
-      } else {
-        syncStatus.message = `Downloading historical bhavcopy for date: ${dateStr} (NSE Direct)`;
-      }
+      syncStatus.message = `Syncing historical bhavcopy for date: ${dateStr}`;
 
       const zipBuf = await fetchBhavcopy(dateObj, i + 1, tradingDates.length, signal);
       
@@ -1004,14 +1047,22 @@ async function runBhavcopySyncTask(monthsOrFromDate: number | string, toDateSele
             
             parseBhavcopyCsv(csvText, dateStr);
             syncStatus.downloadedCount++;
+          } else {
+            console.error(`Zip archive for ${dateStr} is empty.`);
+            syncStatus.errorCount++;
+            syncStatus.message = `Sync error: Empty ZIP archive for ${dateStr}`;
           }
         } catch (zipErr: any) {
           console.error(`Zip extraction error for date ${dateStr}:`, zipErr.message);
           syncStatus.errorCount++;
+          syncStatus.message = `Sync error: Failed to parse historical data for ${dateStr}`;
         }
       } else {
-        // Weekend or NSE Holiday
         syncStatus.errorCount++;
+        syncStatus.message = `Sync error: No data downloaded for ${dateStr}`;
+        if (tradingDates.length === 1) {
+          throw new Error(`Sync error: No data downloaded for ${dateStr}.`);
+        }
       }
 
       // Respect exchange guidelines: 125ms delay between local/remote loops to keep operations clean
@@ -1020,6 +1071,10 @@ async function runBhavcopySyncTask(monthsOrFromDate: number | string, toDateSele
 
     if (signal.aborted) {
       throw new Error("Task was aborted.");
+    }
+
+    if (syncStatus.downloadedCount === 0) {
+      throw new Error("Sync error: No data has been downloaded or offline-cached.");
     }
 
     // Execution calculations & Clustering starts
